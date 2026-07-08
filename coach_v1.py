@@ -3,6 +3,7 @@
 # session-only saved chats, downloadable chat transcript, and JSONL logging.
 
 import json
+import base64
 import datetime
 import pathlib
 import tempfile
@@ -30,6 +31,7 @@ Use this format when helpful:
 3. Practice or next step
 
 Rules:
+- Remember details the student gives you earlier in the same chat, such as their name, and use them naturally later.
 - If the student asks for direct answers to graded work, guide them instead of doing it for them.
 - If you are unsure, say so clearly.
 - Do not invent citations, deadlines, university policies, holidays, or facts.
@@ -42,34 +44,58 @@ Rules:
 def system_prompt_with_date(system_prompt):
     today = datetime.date.today().strftime("%A, %B %d, %Y")
     return (
-        f"Current local date: {today}.\n"
-        "Use this date for study planning and scheduling help. "
-        "Do not claim live web access or official holiday lookup.\n\n"
-        f"{system_prompt}"
+        f"Current local date: {today}." + chr(10)
+        + "Use this date for study planning and scheduling help. "
+        + "Do not claim live web access or official holiday lookup."
+        + chr(10) + chr(10)
+        + system_prompt
     )
 
 
+def _extract_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return _extract_text(value.get("content", ""))
+    if hasattr(value, "content"):
+        return _extract_text(value.content)
+    if isinstance(value, (list, tuple)):
+        return " ".join(_extract_text(v) for v in value)
+    return str(value)
+
+
 def build_messages(system_prompt, history, message):
-    """
-    Build the message list sent to the model.
-
-    Gradio's Chatbot history uses messages like:
-    {"role": "user", "content": "..."}
-    {"role": "assistant", "content": "..."}
-
-    The model itself is stateless, so we create memory by re-sending:
-    system prompt + previous chat history + the new user message.
-    """
     msgs = [SystemMessage(content=system_prompt_with_date(system_prompt))]
 
-    for turn in history:
-        role = turn.get("role")
-        content = turn.get("content", "")
+    for turn in history or []:
+        if isinstance(turn, dict):
+            role = turn.get("role")
+            content = _extract_text(turn.get("content", "")).strip()
 
-        if role == "user":
-            msgs.append(HumanMessage(content=content))
-        elif role == "assistant":
-            msgs.append(AIMessage(content=content))
+            if role == "user" and content:
+                msgs.append(HumanMessage(content=content))
+            elif role == "assistant" and content:
+                msgs.append(AIMessage(content=content))
+
+        elif hasattr(turn, "role") and hasattr(turn, "content"):
+            role = turn.role
+            content = _extract_text(turn.content).strip()
+
+            if role == "user" and content:
+                msgs.append(HumanMessage(content=content))
+            elif role == "assistant" and content:
+                msgs.append(AIMessage(content=content))
+
+        elif isinstance(turn, (list, tuple)) and len(turn) >= 2:
+            user_msg = _extract_text(turn[0]).strip()
+            bot_msg = _extract_text(turn[1]).strip()
+
+            if user_msg:
+                msgs.append(HumanMessage(content=user_msg))
+            if bot_msg:
+                msgs.append(AIMessage(content=bot_msg))
 
     msgs.append(HumanMessage(content=message))
     return msgs
@@ -86,23 +112,27 @@ def log_interaction(user_message, coach_response, temperature, system_prompt):
     }
 
     with LOG.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        f.write(json.dumps(record, ensure_ascii=False) + chr(10))
 
 
-def respond(message, history, temperature, system_prompt):
-    if not message.strip():
-        yield "", history
+def respond(message, display_history, memory_history, temperature, system_prompt):
+    if not message or not message.strip():
+        yield "", display_history, memory_history
         return
+
+    if memory_history is None:
+        memory_history = []
 
     llm = ChatOllama(
         model=MODEL_NAME,
         temperature=float(temperature),
     )
 
-    msgs = build_messages(system_prompt, history, message)
+    msgs = build_messages(system_prompt, memory_history, message)
 
     answer = ""
-    updated_history = history + [
+
+    updated_memory = memory_history + [
         {"role": "user", "content": message},
         {"role": "assistant", "content": answer},
     ]
@@ -111,19 +141,21 @@ def respond(message, history, temperature, system_prompt):
         for chunk in llm.stream(msgs):
             if chunk.content:
                 answer += chunk.content
-                updated_history[-1] = {"role": "assistant", "content": answer}
-                yield "", updated_history
+                updated_memory[-1] = {"role": "assistant", "content": answer}
+                yield "", updated_memory, updated_memory
 
         log_interaction(message, answer, temperature, system_prompt)
 
     except Exception as e:
         error_message = (
-            "I could not connect to the local Ollama model.\n\n"
-            "Try opening the Ollama app, then run this file again.\n\n"
-            f"Error: {e}"
+            "I could not connect to the local Ollama model."
+            + chr(10) + chr(10)
+            + "Try opening the Ollama app, then run this file again."
+            + chr(10) + chr(10)
+            + f"Error: {e}"
         )
-        updated_history[-1] = {"role": "assistant", "content": error_message}
-        yield "", updated_history
+        updated_memory[-1] = {"role": "assistant", "content": error_message}
+        yield "", updated_memory, updated_memory
 
 
 def make_chat_title(history):
@@ -132,25 +164,51 @@ def make_chat_title(history):
 
     first_user_message = "Saved chat"
 
-    for turn in history:
-        if turn.get("role") == "user":
-            first_user_message = turn.get("content", "Saved chat")
-            break
+    for turn in history or []:
+        if isinstance(turn, dict) and turn.get("role") == "user":
+            content = _extract_text(turn.get("content", "")).strip()
+            if content:
+                first_user_message = content
+                break
 
-    title = first_user_message.strip()[:40]
+        elif hasattr(turn, "role") and hasattr(turn, "content"):
+            if turn.role == "user":
+                content = _extract_text(turn.content).strip()
+                if content:
+                    first_user_message = content
+                    break
 
-    if len(first_user_message) > 40:
+        elif isinstance(turn, (list, tuple)) and len(turn) >= 1:
+            content = _extract_text(turn[0]).strip()
+            if content:
+                first_user_message = content
+                break
+
+    title = first_user_message[:45]
+
+    if len(first_user_message) > 45:
         title += "..."
 
-    timestamp = datetime.datetime.now().strftime("%I:%M %p")
-    return f"{timestamp} — {title}"
+    return title
 
 
 def save_current_chat(history, saved_chats):
+    if saved_chats is None:
+        saved_chats = {}
+
     if not history:
         return saved_chats, gr.update(choices=list(saved_chats.keys())), "No chat to save yet."
 
-    title = make_chat_title(history)
+    base_title = make_chat_title(history)
+    title = base_title
+    count = 2
+
+    saved_chats = dict(saved_chats)
+
+    while title in saved_chats:
+        title = f"{base_title} ({count})"
+        count += 1
+
     saved_chats[title] = history
 
     return (
@@ -161,53 +219,78 @@ def save_current_chat(history, saved_chats):
 
 
 def load_saved_chat(selected_chat, saved_chats):
-    if not selected_chat or selected_chat not in saved_chats:
-        return [], "Choose a saved chat first."
+    if saved_chats is None:
+        saved_chats = {}
 
-    return saved_chats[selected_chat], f"Loaded chat: {selected_chat}"
+    if not selected_chat or selected_chat not in saved_chats:
+        return [], [], "Choose a saved chat first."
+
+    loaded_chat = saved_chats[selected_chat]
+    return loaded_chat, loaded_chat, f"Loaded chat: {selected_chat}"
 
 
 def new_chat():
-    return [], "Started a new chat."
+    return [], [], "Started a new chat."
 
 
 def download_chat(history):
     if not history:
-        return None, "No chat to download yet."
+        return "", "No chat to download yet."
 
     lines = []
-    lines.append("Student Success Coach — Chat Transcript")
+    lines.append("prepPal Chat Transcript")
     lines.append(f"Exported: {datetime.datetime.now().isoformat()}")
     lines.append("")
 
-    for turn in history:
-        role = turn.get("role", "").title()
-        content = turn.get("content", "")
+    for turn in history or []:
+        if isinstance(turn, dict):
+            role = turn.get("role", "").title()
+            content = _extract_text(turn.get("content", ""))
 
-        if role == "User":
-            role = "Student"
-        elif role == "Assistant":
-            role = "Coach"
+            if role == "User":
+                role = "Student"
+            elif role == "Assistant":
+                role = "prepPal"
 
-        lines.append(f"{role}: {content}")
-        lines.append("")
-        lines.append("-" * 60)
-        lines.append("")
+            lines.append(f"{role}: {content}")
+            lines.append("")
+            lines.append("-" * 60)
+            lines.append("")
 
-    transcript = "\n".join(lines)
+        elif isinstance(turn, (list, tuple)) and len(turn) >= 2:
+            user_msg = _extract_text(turn[0])
+            bot_msg = _extract_text(turn[1])
 
-    temp_file = tempfile.NamedTemporaryFile(
-        mode="w",
-        delete=False,
-        suffix=".txt",
-        prefix="student_success_coach_chat_",
-        encoding="utf-8",
-    )
+            if user_msg:
+                lines.append(f"Student: {user_msg}")
+                lines.append("")
+                lines.append("-" * 60)
+                lines.append("")
 
-    temp_file.write(transcript)
-    temp_file.close()
+            if bot_msg:
+                lines.append(f"prepPal: {bot_msg}")
+                lines.append("")
+                lines.append("-" * 60)
+                lines.append("")
 
-    return temp_file.name, "Chat transcript ready to download."
+    transcript = chr(10).join(lines)
+    encoded = base64.b64encode(transcript.encode("utf-8")).decode("ascii")
+
+    download_html = f"""
+    <a id="auto-download-chat"
+       href="data:text/plain;charset=utf-8;base64,{encoded}"
+       download="preppal_chat_transcript.txt"
+       style="display:none;">
+       Download transcript
+    </a>
+    <script>
+        setTimeout(function() {{
+            document.getElementById("auto-download-chat").click();
+        }}, 200);
+    </script>
+    """
+
+    return download_html, "Chat transcript downloaded."
 
 
 CUSTOM_CSS = """
@@ -825,6 +908,7 @@ h3 {
 
 with gr.Blocks() as demo:
     saved_chats_state = gr.State({})
+    chat_memory_state = gr.State([])
 
     gr.HTML("<div id='title'>prepPal - an AI chatbot</div>")
     gr.HTML("<div id='subtitle'>Your private AI study companion powered by Ollama, LangChain, and Gradio</div>")
@@ -879,23 +963,29 @@ with gr.Blocks() as demo:
 
     msg.submit(
         respond,
-        inputs=[msg, chatbot, temp, sys_box],
-        outputs=[msg, chatbot],
+        inputs=[msg, chatbot, chat_memory_state, temp, sys_box],
+        outputs=[msg, chatbot, chat_memory_state],
     )
 
     send_button.click(
         respond,
-        inputs=[msg, chatbot, temp, sys_box],
-        outputs=[msg, chatbot],
+        inputs=[msg, chatbot, chat_memory_state, temp, sys_box],
+        outputs=[msg, chatbot, chat_memory_state],
     )
 
     save_button.click(
         save_current_chat,
-        inputs=[chatbot, saved_chats_state],
+        inputs=[chat_memory_state, saved_chats_state],
         outputs=[saved_chats_state, saved_dropdown, status],
     )
 
     load_button.click(
+        load_saved_chat,
+        inputs=[saved_dropdown, saved_chats_state],
+        outputs=[chatbot, chat_memory_state, status],
+    )
+
+    saved_dropdown.change(
         load_saved_chat,
         inputs=[saved_dropdown, saved_chats_state],
         outputs=[chatbot, status],
@@ -904,13 +994,13 @@ with gr.Blocks() as demo:
     new_button.click(
         new_chat,
         inputs=[],
-        outputs=[chatbot, status],
+        outputs=[chatbot, chat_memory_state, status],
     )
 
     download_button.click(
         download_chat,
-        inputs=[chatbot],
-        outputs=[gr.File(label="Downloaded Chat", visible=False), status],
+        inputs=[chat_memory_state],
+        outputs=[gr.HTML(visible=False), status],
     )
 
 
