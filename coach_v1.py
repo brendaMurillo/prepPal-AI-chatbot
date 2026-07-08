@@ -7,7 +7,7 @@ import datetime
 import pathlib
 import tempfile
 
-import gradio as gr
+import gradio as gr #works
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
