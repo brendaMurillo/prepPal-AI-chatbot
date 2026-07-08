@@ -693,6 +693,133 @@ h3 {
     text-shadow: 0 0 12px rgba(240, 171, 252, 0.55);
 }
 
+/* Thin individual outlines for Chat Option buttons */
+#save-chat-button,
+#load-chat-button,
+#new-chat-button,
+#download-chat-button {
+    width: 92% !important;
+    margin: 10px auto !important;
+    padding: 12px 18px !important;
+    background: rgba(6, 2, 22, 0.94) !important;
+    color: #f0abfc !important;
+    border: 1px solid rgba(192, 132, 252, 0.9) !important;
+    border-radius: 999px !important;
+    box-shadow:
+        0 0 8px rgba(192, 132, 252, 0.34),
+        inset 0 0 10px rgba(88, 28, 135, 0.22) !important;
+}
+
+#save-chat-button:hover,
+#load-chat-button:hover,
+#new-chat-button:hover,
+#download-chat-button:hover {
+    border-color: rgba(147, 197, 253, 0.95) !important;
+    box-shadow:
+        0 0 12px rgba(216, 180, 254, 0.48),
+        0 0 18px rgba(96, 165, 250, 0.24) !important;
+}
+
+
+
+/* Make chatbot replies pink with no highlighted background */
+.chatbot .message,
+.chatbot .message-wrap,
+.chatbot .bubble-wrap,
+.chatbot .assistant,
+.chatbot [data-testid="bot"],
+.chatbot [class*="bot"] {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.chatbot .assistant,
+.chatbot .assistant *,
+.chatbot [data-testid="bot"],
+.chatbot [data-testid="bot"] *,
+.chatbot [class*="bot"],
+.chatbot [class*="bot"] * {
+    color: #f0abfc !important;
+    background: transparent !important;
+    text-shadow: 0 0 8px rgba(240, 171, 252, 0.35) !important;
+}
+
+/* Force assistant replies to be pink and remove the white/gray bubble */
+#main-chatbot .message,
+#main-chatbot .message *,
+#main-chatbot .message-wrap,
+#main-chatbot .message-wrap *,
+#main-chatbot .bubble,
+#main-chatbot .bubble *,
+#main-chatbot .bubble-wrap,
+#main-chatbot .bubble-wrap *,
+#main-chatbot .prose,
+#main-chatbot .prose *,
+#main-chatbot [data-testid="bot"],
+#main-chatbot [data-testid="bot"] *,
+#main-chatbot [class*="bot"],
+#main-chatbot [class*="bot"] *,
+#main-chatbot [class*="assistant"],
+#main-chatbot [class*="assistant"] * {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #f0abfc !important;
+    box-shadow: none !important;
+    text-shadow: 0 0 8px rgba(240, 171, 252, 0.35) !important;
+}
+
+/* Remove white code/markdown-looking panels inside replies */
+#main-chatbot pre,
+#main-chatbot code,
+#main-chatbot p,
+#main-chatbot ol,
+#main-chatbot ul,
+#main-chatbot li {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #f0abfc !important;
+}
+
+/* Make streaming/thinking assistant text match finished assistant text */
+#main-chatbot,
+#main-chatbot *,
+#main-chatbot .message,
+#main-chatbot .message *,
+#main-chatbot .message.pending,
+#main-chatbot .message.pending *,
+#main-chatbot .message.generating,
+#main-chatbot .message.generating *,
+#main-chatbot [class*="pending"],
+#main-chatbot [class*="pending"] *,
+#main-chatbot [class*="generating"],
+#main-chatbot [class*="generating"] *,
+#main-chatbot [class*="streaming"],
+#main-chatbot [class*="streaming"] *,
+#main-chatbot [aria-live],
+#main-chatbot [aria-live] * {
+    color: #f0abfc !important;
+    opacity: 1 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: 0 0 8px rgba(240, 171, 252, 0.35) !important;
+}
+
+/* Keep the chat area dark, not white, while the bot is typing */
+#main-chatbot .prose,
+#main-chatbot .prose *,
+#main-chatbot p,
+#main-chatbot ol,
+#main-chatbot ul,
+#main-chatbot li,
+#main-chatbot pre,
+#main-chatbot code {
+    color: #f0abfc !important;
+    opacity: 1 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
 """
 
 
@@ -712,10 +839,10 @@ with gr.Blocks() as demo:
                 interactive=True,
             )
 
-            save_button = gr.Button("Save Current Chat")
-            load_button = gr.Button("Load Saved Chat")
-            new_button = gr.Button("New Chat")
-            download_button = gr.Button("Download Chat")
+            save_button = gr.Button("Save Current Chat", elem_id="save-chat-button")
+            load_button = gr.Button("Load Saved Chat", elem_id="load-chat-button")
+            new_button = gr.Button("New Chat", elem_id="new-chat-button")
+            download_button = gr.Button("Download Chat", elem_id="download-chat-button")
 
             status = gr.Textbox(label="Status", interactive=False, lines=1)
 
@@ -738,6 +865,7 @@ with gr.Blocks() as demo:
 
         with gr.Column(scale=3):
             chatbot = gr.Chatbot(
+                elem_id="main-chatbot",
                 label="prepPal Chat",
                 height=430,
             )
