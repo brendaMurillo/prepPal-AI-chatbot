@@ -1016,10 +1016,10 @@ with gr.Blocks() as demo:
             temp = gr.Slider(
                 minimum=0.0,
                 maximum=1.0,
-                value=0.4,
+                value=0.5,
                 step=0.1,
                 label="Creativity / Temperature",
-                info="0 = focused and consistent. 1 = more creative and varied.",
+                info="0 = focused and consistent. 0.5 = balanced. 1 = more creative and varied.",
             )
 
             with gr.Accordion("Live System Prompt", open=False):
