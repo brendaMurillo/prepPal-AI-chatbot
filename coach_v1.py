@@ -903,6 +903,56 @@ h3 {
     background-color: transparent !important;
 }
 
+/* Move prepPal Chat label above the chatbot so it does not overlap messages */
+#main-chatbot {
+    position: relative !important;
+    padding-top: 34px !important;
+}
+
+#main-chatbot label,
+#main-chatbot .label-wrap,
+#main-chatbot .label-wrap span {
+    position: absolute !important;
+    top: 8px !important;
+    left: 16px !important;
+    z-index: 10 !important;
+    background: rgba(6, 2, 22, 0.96) !important;
+    color: #f0abfc !important;
+    padding: 2px 10px !important;
+    border-radius: 8px !important;
+    text-shadow: 0 0 8px rgba(240, 171, 252, 0.55) !important;
+}
+
+/* Put prepPal Chat outside/above the chat box */
+#chat-title-outside {
+    margin: 0 0 6px 12px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#chat-title-outside h3 {
+    color: #f0abfc !important;
+    font-size: 1rem !important;
+    text-transform: none !important;
+    letter-spacing: 0.4px !important;
+    margin: 0 !important;
+    text-shadow: 0 0 8px rgba(240, 171, 252, 0.55) !important;
+}
+
+/* Hide the built-in label inside the chatbot */
+#main-chatbot label,
+#main-chatbot .label-wrap,
+#main-chatbot .label-wrap span {
+    display: none !important;
+}
+
+/* Remove extra top padding from the previous label attempt */
+#main-chatbot {
+    padding-top: 0 !important;
+}
+
 """
 
 
@@ -948,9 +998,11 @@ with gr.Blocks() as demo:
                 )
 
         with gr.Column(scale=3):
+            gr.Markdown("### prepPal Chat", elem_id="chat-title-outside")
+
             chatbot = gr.Chatbot(
                 elem_id="main-chatbot",
-                label="prepPal Chat",
+                label="",
                 height=430,
             )
 
