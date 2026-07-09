@@ -953,6 +953,38 @@ h3 {
     padding-top: 0 !important;
 }
 
+
+
+/* ===== Load Saved Chat dropdown styling ===== */
+
+#load-chat-dropdown {
+    background: rgba(6, 2, 22, 0.96) !important;
+    border: 1px solid rgba(216, 180, 254, 0.85) !important;
+    border-radius: 10px !important;
+    box-shadow:
+        0 0 10px rgba(216, 180, 254, 0.42),
+        0 0 22px rgba(168, 85, 247, 0.24),
+        inset 0 0 14px rgba(88, 28, 135, 0.32) !important;
+}
+
+#load-chat-dropdown label,
+#load-chat-dropdown .label-wrap,
+#load-chat-dropdown .label-wrap span {
+    color: #f0abfc !important;
+    background: transparent !important;
+    border: none !important;
+    text-shadow: 0 0 10px rgba(240, 171, 252, 0.55) !important;
+}
+
+#load-chat-dropdown input,
+#load-chat-dropdown select,
+#load-chat-dropdown [role="combobox"],
+#load-chat-dropdown [role="listbox"] {
+    background: rgba(4, 1, 16, 0.98) !important;
+    color: #f5f3ff !important;
+    border: 1.5px solid rgba(147, 197, 253, 0.5) !important;
+    border-radius: 10px !important;
+}
 """
 
 
@@ -969,12 +1001,13 @@ with gr.Blocks() as demo:
 
             saved_dropdown = gr.Dropdown(
                 choices=[],
-                label="Saved Chats",
+                label="Load Saved Chat",
+                info="Click the dropdown, then choose the chat title you want to load.",
                 interactive=True,
+                elem_id="load-chat-dropdown",
             )
 
             save_button = gr.Button("Save Current Chat", elem_id="save-chat-button")
-            load_button = gr.Button("Load Saved Chat", elem_id="load-chat-button")
             new_button = gr.Button("New Chat", elem_id="new-chat-button")
             download_button = gr.Button("Download Chat", elem_id="download-chat-button")
 
@@ -1031,16 +1064,10 @@ with gr.Blocks() as demo:
         outputs=[saved_chats_state, saved_dropdown, status],
     )
 
-    load_button.click(
-        load_saved_chat,
-        inputs=[saved_dropdown, saved_chats_state],
-        outputs=[chatbot, chat_memory_state, status],
-    )
-
     saved_dropdown.change(
         load_saved_chat,
         inputs=[saved_dropdown, saved_chats_state],
-        outputs=[chatbot, status],
+        outputs=[chatbot, chat_memory_state, status],
     )
 
     new_button.click(
