@@ -233,9 +233,12 @@ def new_chat():
     return [], [], "Started a new chat."
 
 
-def download_chat(history):
+def download_chat(history, prepared_file):
+    if prepared_file:
+        return prepared_file, "Transcript successfully downloaded.", None
+
     if not history:
-        return None, "No chat to download yet."
+        return None, "No chat to download yet.", None
 
     lines = []
     lines.append("prepPal Chat Transcript")
@@ -286,7 +289,7 @@ def download_chat(history):
     with temp_file as f:
         f.write(transcript)
 
-    return temp_file.name, "Chat transcript ready."
+    return temp_file.name, "Chat transcript ready. Click Download Chat again.", temp_file.name
 
 
 CUSTOM_CSS = """
@@ -987,6 +990,7 @@ h3 {
 with gr.Blocks() as demo:
     saved_chats_state = gr.State({})
     chat_memory_state = gr.State([])
+    prepared_download_state = gr.State(None)
 
     gr.HTML("<div id='title'>prepPal - an AI chatbot</div>")
     gr.HTML("<div id='subtitle'>Your private AI study companion powered by Ollama, LangChain, and Gradio</div>")
@@ -1078,8 +1082,8 @@ with gr.Blocks() as demo:
 
     download_button.click(
         download_chat,
-        inputs=[chat_memory_state],
-        outputs=[download_button, status],
+        inputs=[chat_memory_state, prepared_download_state],
+        outputs=[download_button, status, prepared_download_state],
     )
 
 
