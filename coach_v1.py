@@ -235,7 +235,7 @@ def new_chat():
 
 def download_chat(history):
     if not history:
-        return "", "No chat to download yet."
+        return gr.update(value=None, visible=False), "No chat to download yet."
 
     lines = []
     lines.append("prepPal Chat Transcript")
@@ -274,23 +274,19 @@ def download_chat(history):
                 lines.append("")
 
     transcript = chr(10).join(lines)
-    encoded = base64.b64encode(transcript.encode("utf-8")).decode("ascii")
 
-    download_html = f"""
-    <a id="auto-download-chat"
-       href="data:text/plain;charset=utf-8;base64,{encoded}"
-       download="preppal_chat_transcript.txt"
-       style="display:none;">
-       Download transcript
-    </a>
-    <script>
-        setTimeout(function() {{
-            document.getElementById("auto-download-chat").click();
-        }}, 200);
-    </script>
-    """
+    temp_file = tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=".txt",
+        prefix="preppal_chat_transcript_",
+        mode="w",
+        encoding="utf-8",
+    )
 
-    return download_html, "Chat transcript downloaded."
+    with temp_file as f:
+        f.write(transcript)
+
+    return gr.update(value=temp_file.name, visible=True), "Chat transcript is ready to download."
 
 
 CUSTOM_CSS = """
@@ -1011,6 +1007,12 @@ with gr.Blocks() as demo:
             new_button = gr.Button("New Chat", elem_id="new-chat-button")
             download_button = gr.Button("Download Chat", elem_id="download-chat-button")
 
+            download_file = gr.File(
+                label="Download Transcript",
+                visible=False,
+                interactive=False,
+            )
+
             status = gr.Textbox(label="Status", interactive=False, lines=1)
 
             temp = gr.Slider(
@@ -1079,7 +1081,7 @@ with gr.Blocks() as demo:
     download_button.click(
         download_chat,
         inputs=[chat_memory_state],
-        outputs=[gr.HTML(visible=False), status],
+        outputs=[download_file, status],
     )
 
 
