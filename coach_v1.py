@@ -235,7 +235,7 @@ def new_chat():
 
 def download_chat(history):
     if not history:
-        return gr.update(value=None, visible=False), "No chat to download yet."
+        return None, "No chat to download yet."
 
     lines = []
     lines.append("prepPal Chat Transcript")
@@ -286,7 +286,7 @@ def download_chat(history):
     with temp_file as f:
         f.write(transcript)
 
-    return gr.update(value=temp_file.name, visible=True), "Chat transcript is ready to download."
+    return temp_file.name, "Chat transcript ready."
 
 
 CUSTOM_CSS = """
@@ -1005,12 +1005,10 @@ with gr.Blocks() as demo:
 
             save_button = gr.Button("Save Current Chat", elem_id="save-chat-button")
             new_button = gr.Button("New Chat", elem_id="new-chat-button")
-            download_button = gr.Button("Download Chat", elem_id="download-chat-button")
-
-            download_file = gr.File(
-                label="Download Transcript",
-                visible=False,
-                interactive=False,
+            download_button = gr.DownloadButton(
+                "Download Chat",
+                value=None,
+                elem_id="download-chat-button",
             )
 
             status = gr.Textbox(label="Status", interactive=False, lines=1)
@@ -1081,7 +1079,7 @@ with gr.Blocks() as demo:
     download_button.click(
         download_chat,
         inputs=[chat_memory_state],
-        outputs=[download_file, status],
+        outputs=[download_button, status],
     )
 
 
